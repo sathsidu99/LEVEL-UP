@@ -1,676 +1,230 @@
-from flask import Flask, render_template_string, request, jsonify
 import json
+import logging
 import os
+import sys
+import threading
 import time
 from datetime import datetime
 
-app = Flask(__name__)
+# Add parent directory to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# HTML Template - Clean Modern Dashboard
-HTML_TEMPLATE = '''
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Bot Dashboard | @THEROSHAN</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Inter', sans-serif;
-            background: #0f0f1a;
-            color: #fff;
-            overflow-x: hidden;
-        }
-        
-        /* Animated Background */
-        .bg-animation {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            opacity: 0.1;
-        }
-        
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        /* Header */
-        .header {
-            text-align: center;
-            padding: 40px 20px;
-            margin-bottom: 40px;
-        }
-        
-        .logo {
-            font-size: 3em;
-            margin-bottom: 10px;
-        }
-        
-        h1 {
-            font-size: 2.5em;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
-        }
-        
-        .subtitle {
-            color: #888;
-            font-size: 1.1em;
-        }
-        
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 25px;
-            margin-bottom: 40px;
-        }
-        
-        .stat-card {
-            background: rgba(255,255,255,0.05);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 25px;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: all 0.3s ease;
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-5px);
-            background: rgba(255,255,255,0.08);
-            border-color: rgba(102,126,234,0.5);
-        }
-        
-        .stat-icon {
-            font-size: 2.5em;
-            margin-bottom: 15px;
-        }
-        
-        .stat-title {
-            color: #888;
-            font-size: 0.9em;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 10px;
-        }
-        
-        .stat-value {
-            font-size: 2.5em;
-            font-weight: 800;
-            color: #667eea;
-        }
-        
-        /* Control Panel */
-        .control-panel {
-            background: rgba(255,255,255,0.05);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 30px;
-            margin-bottom: 40px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .section-title {
-            font-size: 1.5em;
-            margin-bottom: 20px;
-            color: #667eea;
-        }
-        
-        .button-group {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-        
-        .btn {
-            padding: 12px 30px;
-            border: none;
-            border-radius: 10px;
-            font-size: 1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-family: 'Inter', sans-serif;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102,126,234,0.4);
-        }
-        
-        .btn-danger {
-            background: linear-gradient(135deg, #f56565, #ed64a6);
-            color: white;
-        }
-        
-        .btn-danger:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(245,101,101,0.4);
-        }
-        
-        .btn-success {
-            background: linear-gradient(135deg, #48bb78, #38a169);
-            color: white;
-        }
-        
-        .btn-warning {
-            background: linear-gradient(135deg, #ed8936, #dd6b20);
-            color: white;
-        }
-        
-        /* Team Code Input */
-        .team-input-group {
-            display: flex;
-            gap: 15px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-        
-        .team-input {
-            flex: 1;
-            padding: 12px 20px;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 10px;
-            color: white;
-            font-size: 1em;
-            font-family: 'Inter', sans-serif;
-        }
-        
-        .team-input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        /* Logs Section */
-        .logs-section {
-            background: rgba(255,255,255,0.05);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 30px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .logs-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        
-        .logs-container {
-            background: #0a0a0f;
-            border-radius: 15px;
-            padding: 20px;
-            height: 400px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 0.85em;
-        }
-        
-        .log-entry {
-            padding: 8px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            font-family: monospace;
-        }
-        
-        .log-time {
-            color: #667eea;
-            margin-right: 15px;
-        }
-        
-        .log-info {
-            color: #48bb78;
-        }
-        
-        .log-warning {
-            color: #ed8936;
-        }
-        
-        .log-error {
-            color: #f56565;
-        }
-        
-        /* Status Badge */
-        .status-badge {
-            display: inline-block;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: 600;
-        }
-        
-        .status-online {
-            background: rgba(72,187,120,0.2);
-            color: #48bb78;
-            border: 1px solid #48bb78;
-        }
-        
-        .status-offline {
-            background: rgba(245,101,101,0.2);
-            color: #f56565;
-            border: 1px solid #f56565;
-        }
-        
-        /* Scrollbar */
-        .logs-container::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        .logs-container::-webkit-scrollbar-track {
-            background: rgba(255,255,255,0.05);
-            border-radius: 10px;
-        }
-        
-        .logs-container::-webkit-scrollbar-thumb {
-            background: #667eea;
-            border-radius: 10px;
-        }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-            .container {
-                padding: 15px;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .button-group {
-                flex-direction: column;
-            }
-            
-            .btn {
-                width: 100%;
-            }
-            
-            .team-input-group {
-                flex-direction: column;
-            }
-            
-            h1 {
-                font-size: 1.8em;
-            }
-        }
-        
-        /* Loading Animation */
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        .loading {
-            animation: pulse 1s infinite;
-        }
-        
-        /* Tooltip */
-        .tooltip {
-            position: relative;
-            display: inline-block;
-        }
-        
-        .tooltip .tooltip-text {
-            visibility: hidden;
-            background: #333;
-            color: #fff;
-            text-align: center;
-            padding: 5px 10px;
-            border-radius: 6px;
-            position: absolute;
-            z-index: 1;
-            bottom: 125%;
-            left: 50%;
-            transform: translateX(-50%);
-            white-space: nowrap;
-            font-size: 12px;
-        }
-        
-        .tooltip:hover .tooltip-text {
-            visibility: visible;
-        }
-    </style>
-</head>
-<body>
-    <div class="bg-animation"></div>
-    
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div class="logo">🎮</div>
-            <h1>FreeFire Bot Dashboard</h1>
-            <p class="subtitle">Real-time Bot Monitoring & Control Panel</p>
-            <div style="margin-top: 20px;">
-                <span class="status-badge status-online" id="botStatusBadge">● Bot Active</span>
-            </div>
-        </div>
-        
-        <!-- Stats Grid -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon">🎯</div>
-                <div class="stat-title">Active Teams</div>
-                <div class="stat-value" id="activeTeams">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">🚀</div>
-                <div class="stat-title">Matches Started</div>
-                <div class="stat-value" id="matchesStarted">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">⏱️</div>
-                <div class="stat-title">Uptime</div>
-                <div class="stat-value" id="uptime">0h</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">💾</div>
-                <div class="stat-title">Memory Usage</div>
-                <div class="stat-value" id="memory">0%</div>
-            </div>
-        </div>
-        
-        <!-- Control Panel -->
-        <div class="control-panel">
-            <div class="section-title">🎮 Bot Controls</div>
-            
-            <div class="team-input-group">
-                <input type="text" class="team-input" id="teamCode" placeholder="Enter Team Code (e.g., 123456)" />
-                <button class="btn btn-primary" onclick="startBot()">▶️ Start Bot</button>
-            </div>
-            
-            <div class="button-group" style="margin-top: 20px;">
-                <button class="btn btn-danger" onclick="stopBot()">⏹️ Stop Bot</button>
-                <button class="btn btn-warning" onclick="restartBot()">🔄 Restart Bot</button>
-                <button class="btn btn-success" onclick="refreshData()">🔄 Refresh Status</button>
-                <button class="btn btn-primary" onclick="clearLogs()">🗑️ Clear Logs</button>
-            </div>
-        </div>
-        
-        <!-- Current Status -->
-        <div class="control-panel">
-            <div class="section-title">📊 Current Status</div>
-            <div id="currentStatus">
-                <p><strong>Current Team:</strong> <span id="currentTeam">None</span></p>
-                <p><strong>Bot Status:</strong> <span id="botRunning">Idle</span></p>
-                <p><strong>Last Action:</strong> <span id="lastAction">No actions yet</span></p>
-            </div>
-        </div>
-        
-        <!-- Logs Section -->
-        <div class="logs-section">
-            <div class="logs-header">
-                <div class="section-title">📝 Live Logs</div>
-                <button class="btn btn-primary" onclick="refreshLogs()" style="padding: 8px 20px;">🔄 Refresh</button>
-            </div>
-            <div class="logs-container" id="logs">
-                <div class="log-entry">Waiting for logs...</div>
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        let autoRefreshInterval;
-        
-        // Start auto-refresh
-        function startAutoRefresh() {
-            if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-            autoRefreshInterval = setInterval(() => {
-                refreshData();
-                refreshLogs();
-            }, 5000);
-        }
-        
-        // Refresh all data
-        function refreshData() {
-            fetch('/api/status')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('activeTeams').innerText = data.active_teams || 0;
-                    document.getElementById('matchesStarted').innerText = data.matches_started || 0;
-                    document.getElementById('uptime').innerText = data.uptime || '0h';
-                    document.getElementById('memory').innerText = data.memory || '0%';
-                    document.getElementById('currentTeam').innerText = data.current_team || 'None';
-                    document.getElementById('botRunning').innerText = data.running ? 'Running' : 'Stopped';
-                    
-                    const statusBadge = document.getElementById('botStatusBadge');
-                    if (data.running) {
-                        statusBadge.className = 'status-badge status-online';
-                        statusBadge.innerHTML = '● Bot Active';
-                    } else {
-                        statusBadge.className = 'status-badge status-offline';
-                        statusBadge.innerHTML = '● Bot Inactive';
-                    }
-                })
-                .catch(err => console.error('Error:', err));
-        }
-        
-        // Refresh logs
-        function refreshLogs() {
-            fetch('/api/logs')
-                .then(response => response.json())
-                .then(data => {
-                    const logsDiv = document.getElementById('logs');
-                    if (data.logs && data.logs.length > 0) {
-                        logsDiv.innerHTML = data.logs.map(log => `
-                            <div class="log-entry">
-                                <span class="log-time">[${log.time}]</span>
-                                <span class="log-${log.level.toLowerCase()}">[${log.level}]</span>
-                                <span>${log.message}</span>
-                            </div>
-                        `).join('');
-                        logsDiv.scrollTop = logsDiv.scrollHeight;
-                    } else {
-                        logsDiv.innerHTML = '<div class="log-entry">No logs available</div>';
-                    }
-                })
-                .catch(err => console.error('Error:', err));
-        }
-        
-        // Start bot with team code
-        function startBot() {
-            const teamCode = document.getElementById('teamCode').value;
-            if (!teamCode) {
-                alert('Please enter a team code!');
-                return;
-            }
-            
-            fetch('/api/control', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'start', team_code: teamCode })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(`Bot started for team ${teamCode}!`);
-                    document.getElementById('lastAction').innerText = `Started bot for team ${teamCode}`;
-                    refreshData();
-                } else {
-                    alert('Error: ' + data.error);
-                }
-            })
-            .catch(err => alert('Error: ' + err));
-        }
-        
-        // Stop bot
-        function stopBot() {
-            if (confirm('Are you sure you want to stop the bot?')) {
-                fetch('/api/control', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'stop' })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Bot stopped!');
-                        document.getElementById('lastAction').innerText = 'Stopped bot';
-                        refreshData();
-                    } else {
-                        alert('Error: ' + data.error);
-                    }
-                })
-                .catch(err => alert('Error: ' + err));
-            }
-        }
-        
-        // Restart bot
-        function restartBot() {
-            if (confirm('Restart the bot? This may take a few seconds.')) {
-                fetch('/api/control', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'restart' })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Bot restarting...');
-                        document.getElementById('lastAction').innerText = 'Restarted bot';
-                        setTimeout(() => refreshData(), 3000);
-                    } else {
-                        alert('Error: ' + data.error);
-                    }
-                })
-                .catch(err => alert('Error: ' + err));
-            }
-        }
-        
-        // Clear logs
-        function clearLogs() {
-            fetch('/api/control', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'clear_logs' })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Logs cleared!');
-                    refreshLogs();
-                }
-            })
-            .catch(err => alert('Error: ' + err));
-        }
-        
-        // Initial load
-        startAutoRefresh();
-        refreshData();
-        refreshLogs();
-    </script>
-</body>
-</html>
-'''
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
 
-# Store bot state (in production, use a database)
-bot_state = {
-    'running': False,
-    'current_team': None,
-    'active_teams': 0,
-    'matches_started': 0,
-    'start_time': datetime.now(),
-    'logs': []
-}
+# Import your existing modules
+from byte import *
+from important_zitado import *
 
-@app.route('/')
-def dashboard():
-    return render_template_string(HTML_TEMPLATE)
+# ================== CONFIG ==================
+PROMO_TEXT = "Tg @THEROSHAN | Ig @THEROSHAN"
+START_SPAM_DURATION = 18
+WAIT_AFTER_MATCH_SECONDS = 20
+START_SPAM_DELAY = 0.2
 
-@app.route('/api/status')
-def get_status():
-    uptime = (datetime.now() - bot_state['start_time']).total_seconds()
-    hours = int(uptime // 3600)
-    minutes = int((uptime % 3600) // 60)
-    
-    return jsonify({
-        'running': bot_state['running'],
-        'current_team': bot_state['current_team'],
-        'active_teams': bot_state['active_teams'],
-        'matches_started': bot_state['matches_started'],
-        'uptime': f"{hours}h {minutes}m",
-        'memory': '45'  # Placeholder
-    })
+# ================== LOGGING ==================
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
-@app.route('/api/logs')
-def get_logs():
-    # Get last 100 logs
-    recent_logs = bot_state['logs'][-100:]
-    return jsonify({'logs': recent_logs})
+# Global state
+active_bots: Dict[str, Dict] = {}
+app = FastAPI()
 
-@app.route('/api/control', methods=['POST'])
-def control_bot():
-    data = request.json
-    action = data.get('action')
-    
-    if action == 'start':
-        team_code = data.get('team_code')
-        bot_state['running'] = True
-        bot_state['current_team'] = team_code
-        bot_state['active_teams'] = 1
-        
-        # Add log
-        bot_state['logs'].append({
-            'time': datetime.now().strftime('%H:%M:%S'),
-            'level': 'INFO',
-            'message': f'Bot started for team {team_code}'
-        })
-        
-        return jsonify({'success': True, 'message': f'Bot started for team {team_code}'})
-    
-    elif action == 'stop':
-        bot_state['running'] = False
-        bot_state['current_team'] = None
-        bot_state['active_teams'] = 0
-        
-        bot_state['logs'].append({
-            'time': datetime.now().strftime('%H:%M:%S'),
-            'level': 'INFO',
-            'message': 'Bot stopped by user'
-        })
-        
-        return jsonify({'success': True, 'message': 'Bot stopped'})
-    
-    elif action == 'restart':
-        bot_state['running'] = True
-        bot_state['matches_started'] += 1
-        
-        bot_state['logs'].append({
-            'time': datetime.now().strftime('%H:%M:%S'),
-            'level': 'INFO',
-            'message': 'Bot restarted'
-        })
-        
-        return jsonify({'success': True, 'message': 'Bot restarted'})
-    
-    elif action == 'clear_logs':
-        bot_state['logs'] = []
-        return jsonify({'success': True, 'message': 'Logs cleared'})
-    
-    return jsonify({'success': False, 'error': 'Unknown action'})
+class StartBotRequest(BaseModel):
+    team_code: str
+    account_id: str
+    password: str
 
-# Vercel handler
-app = app
+class StopBotRequest(BaseModel):
+    account_id: str
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+class BotStatusResponse(BaseModel):
+    status: str
+    message: str
+    active_bots: Dict
+
+# ================== BOT MANAGER CLASS ==================
+class BotManager:
+    def __init__(self, uid: str, password: str):
+        self.uid = uid
+        self.password = password
+        self.running = False
+        self.thread = None
+        self.team_code = None
+        self.key = None
+        self.iv = None
+        self.socket_client = None
+        
+    def start_bot(self, team_code: str):
+        """Start the bot for a specific team code"""
+        self.team_code = team_code
+        self.running = True
+        self.thread = threading.Thread(target=self._run_bot, daemon=True)
+        self.thread.start()
+        return f"Bot started for team {team_code}"
+    
+    def stop_bot(self):
+        """Stop the bot"""
+        self.running = False
+        if self.thread:
+            self.thread.join(timeout=5)
+        return "Bot stopped"
+    
+    def _run_bot(self):
+        """Main bot loop"""
+        try:
+            # Login and get token
+            token_data = self._login()
+            if not token_data:
+                logging.error(f"Login failed for {self.uid}")
+                return
+            
+            # Connect to game servers
+            self._connect_to_game(token_data)
+            
+            # Auto start loop
+            while self.running:
+                self._auto_start_cycle()
+                
+        except Exception as e:
+            logging.error(f"Bot error: {e}")
+        finally:
+            self.running = False
+    
+    def _login(self):
+        """Login to FreeFire"""
+        # Import your existing FF_CLIENT login logic here
+        # Simplified version:
+        try:
+            from app import FF_CLIENT
+            client = FF_CLIENT(self.uid, self.password)
+            # The login happens in __init__
+            if client.key and client.iv:
+                self.key = client.key
+                self.iv = client.iv
+                return True
+        except Exception as e:
+            logging.error(f"Login error: {e}")
+        return False
+    
+    def _connect_to_game(self, token_data):
+        """Connect to game servers"""
+        # Your existing socket connection logic
+        pass
+    
+    def _auto_start_cycle(self):
+        """Single auto-start cycle"""
+        if not self.running:
+            return
+        
+        # Join team
+        # Send start packet
+        # Wait
+        # Leave and repeat
+        
+        time.sleep(WAIT_AFTER_MATCH_SECONDS)
+
+# ================== API ENDPOINTS ==================
+
+@app.get("/")
+async def root():
+    return {
+        "status": "online",
+        "message": "FreeFire Auto Start Bot",
+        "version": "1.0.0",
+        "endpoints": {
+            "/start": "POST - Start bot with team code",
+            "/stop": "POST - Stop bot",
+            "/status": "GET - Get bot status",
+            "/health": "GET - Health check"
+        }
+    }
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+@app.post("/start")
+async def start_bot(request: StartBotRequest):
+    """Start the bot with a team code"""
+    try:
+        account_id = request.account_id
+        password = request.password
+        team_code = request.team_code
+        
+        # Validate team code (only numbers)
+        if not team_code.isdigit():
+            raise HTTPException(status_code=400, detail="Team code must contain only numbers")
+        
+        # Check if bot already running for this account
+        if account_id in active_bots and active_bots[account_id].running:
+            return BotStatusResponse(
+                status="already_running",
+                message=f"Bot already running for account {account_id}",
+                active_bots={aid: "running" for aid in active_bots}
+            )
+        
+        # Create and start bot
+        bot = BotManager(account_id, password)
+        message = bot.start_bot(team_code)
+        active_bots[account_id] = bot
+        
+        return BotStatusResponse(
+            status="started",
+            message=message,
+            active_bots={aid: "running" for aid in active_bots}
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Start bot error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/stop")
+async def stop_bot(request: StopBotRequest):
+    """Stop the bot for an account"""
+    try:
+        account_id = request.account_id
+        
+        if account_id not in active_bots:
+            return BotStatusResponse(
+                status="not_found",
+                message=f"No active bot found for account {account_id}",
+                active_bots={aid: "running" for aid in active_bots}
+            )
+        
+        message = active_bots[account_id].stop_bot()
+        del active_bots[account_id]
+        
+        return BotStatusResponse(
+            status="stopped",
+            message=message,
+            active_bots={aid: "running" for aid in active_bots}
+        )
+        
+    except Exception as e:
+        logging.error(f"Stop bot error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/status")
+async def get_status():
+    """Get all active bots status"""
+    return BotStatusResponse(
+        status="ok",
+        message=f"{len(active_bots)} active bots",
+        active_bots={aid: "running" for aid in active_bots}
+    )
+
+@app.get("/accounts")
+async def list_accounts():
+    """List available accounts from bot.txt"""
+    try:
+        with open("bot.txt", "r") as f:
+            accounts = json.load(f)
+        return {"accounts": list(accounts.keys())}
+    except Exception as e:
+        return {"accounts": [], "error": str(e)}
